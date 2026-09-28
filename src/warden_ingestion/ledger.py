@@ -47,7 +47,9 @@ class IngestionLedger:
                     scrubbed_character_count INTEGER NOT NULL,
                     redaction_hits_json TEXT NOT NULL,
                     chunk_count INTEGER NOT NULL,
-                    status TEXT NOT NULL CHECK(status IN ('PENDING', 'PROCESSING', 'INDEXED', 'FAILED', 'POISON_PILL')),
+                    status TEXT NOT NULL CHECK(
+                        status IN ('PENDING', 'PROCESSING', 'INDEXED', 'FAILED', 'POISON_PILL')
+                    ),
                     error_message TEXT,
                     ingested_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -193,7 +195,8 @@ class IngestionLedger:
         """Fetch all quarantined poison pills."""
         async with self._get_connection() as db:
             db.row_factory = aiosqlite.Row
-            async with db.execute("SELECT * FROM poison_pills ORDER BY quarantined_at DESC;") as cursor:
+            query = "SELECT * FROM poison_pills ORDER BY quarantined_at DESC;"
+            async with db.execute(query) as cursor:
                 rows = await cursor.fetchall()
                 return [
                     PoisonPillRecord(
@@ -275,7 +278,10 @@ class IngestionLedger:
     def _row_to_document(self, row: aiosqlite.Row) -> DocumentRecord:
         role_tags_raw = row["role_tags"]
         try:
-            role_tags = json.loads(role_tags_raw) if isinstance(role_tags_raw, str) else list(role_tags_raw)
+            if isinstance(role_tags_raw, str):
+                role_tags = json.loads(role_tags_raw)
+            else:
+                role_tags = list(role_tags_raw)
         except Exception:
             role_tags = []
 

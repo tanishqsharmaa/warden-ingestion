@@ -1,4 +1,6 @@
-"""Pipeline controller orchestrating ledger checks, PII scrubbing, chunking, embedding, and hand-off."""
+"""Pipeline controller orchestrating ledger checks, PII scrubbing,
+chunking, embedding, and hand-off.
+"""
 
 import hashlib
 import json
@@ -8,7 +10,6 @@ import traceback
 import uuid
 from pathlib import Path
 from typing import Any, Optional
-from urllib.parse import urlparse
 
 import httpx
 

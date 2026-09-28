@@ -1,6 +1,7 @@
 import uuid
+
 import numpy as np
-import pytest
+
 from warden_ingestion.embedder import OnnxEmbedder, generate_point_id
 from warden_ingestion.models import ChunkPayload
 
@@ -43,7 +44,9 @@ def test_embedder_vector_dimensions_and_unit_norm():
     embedder = OnnxEmbedder(session=MockSession(), tokenizer=MockTokenizer(), batch_size=2)
     chunks = [
         ChunkPayload("DOC-001", 0, "PTO is 18 days.", ["Employee"], "file:///doc.md", 10, True),
-        ChunkPayload("DOC-001", 1, "Carryover is 5 days.", ["Employee"], "file:///doc.md", 12, True),
+        ChunkPayload(
+            "DOC-001", 1, "Carryover is 5 days.", ["Employee"], "file:///doc.md", 12, True
+        ),
         ChunkPayload("DOC-002", 0, "Health insurance.", ["Employee"], "file:///doc2.md", 8, True),
     ]
     points = embedder.embed_chunks(chunks)

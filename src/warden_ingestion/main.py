@@ -1,6 +1,7 @@
 """Application entrypoint for running warden-ingestion under Uvicorn."""
 
 import logging
+
 from warden_ingestion.api import create_app
 from warden_ingestion.chunker import TableAwareChunker
 from warden_ingestion.config import settings

@@ -2,8 +2,10 @@ import json
 import time
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
+
 import numpy as np
 import pytest
+from warden_shared.proto.v1 import retrieval_pb2
 
 from warden_ingestion.chunker import TableAwareChunker
 from warden_ingestion.controller import IngestionController
@@ -14,7 +16,6 @@ from warden_ingestion.ledger import IngestionLedger
 from warden_ingestion.models import ChunkPayload
 from warden_ingestion.pii import PresidioScrubberPool
 from warden_ingestion.queue import BoundedChunkQueue
-from warden_shared.proto.v1 import retrieval_pb2
 
 
 class FaultInjectingChunker(TableAwareChunker):

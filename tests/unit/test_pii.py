@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
+
 import pytest
+
 from warden_ingestion.pii import PresidioScrubberPool
 
 
@@ -17,7 +19,8 @@ def test_presidio_scrubbing_100_percent_recall():
             for token in case["expected_tokens"]:
                 assert token in res.text, f"Token {token} not found in scrubbed output: {res.text}"
             for entity in case["expected_entities"]:
-                assert res.redaction_counts.get(entity, 0) > 0, f"Entity {entity} count was 0 in {case['id']}"
+                msg = f"Entity {entity} count was 0 in {case['id']}"
+                assert res.redaction_counts.get(entity, 0) > 0, msg
             if not case["expected_tokens"]:
                 assert len(res.redaction_counts) == 0
                 assert res.character_count_delta == 0

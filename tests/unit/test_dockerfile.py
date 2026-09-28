@@ -1,5 +1,4 @@
 from pathlib import Path
-import pytest
 
 
 def test_dockerfile_ingestion_directives():

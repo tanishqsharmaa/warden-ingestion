@@ -1,9 +1,11 @@
 from unittest.mock import AsyncMock, MagicMock
+
 import grpc
 import pytest
+from warden_shared.proto.v1 import retrieval_pb2
+
 from warden_ingestion.grpc_client import RetrievalGrpcClient
 from warden_ingestion.models import VectorizedPoint
-from warden_shared.proto.v1 import retrieval_pb2
 
 
 @pytest.mark.asyncio
@@ -62,7 +64,9 @@ async def test_index_batch_retry_on_unavailable():
     )
     mock_stub.IndexBatch = AsyncMock(side_effect=[error, mock_response])
 
-    client = RetrievalGrpcClient(target_url="localhost:50051", stub=mock_stub, retry_backoff_base=0.01)
+    client = RetrievalGrpcClient(
+        target_url="localhost:50051", stub=mock_stub, retry_backoff_base=0.01
+    )
     points = [
         VectorizedPoint(
             point_id="pid-1",

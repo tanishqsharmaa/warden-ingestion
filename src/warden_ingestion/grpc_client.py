@@ -5,8 +5,9 @@ import logging
 from typing import Any, Optional
 
 import grpc
-from warden_ingestion.models import VectorizedPoint
 from warden_shared.proto.v1 import retrieval_pb2, retrieval_pb2_grpc
+
+from warden_ingestion.models import VectorizedPoint
 
 logger = logging.getLogger("warden.ingestion.grpc_client")
 

@@ -1,7 +1,8 @@
 import aiosqlite
 import pytest
+
 from warden_ingestion.ledger import IngestionLedger
-from warden_ingestion.models import DocumentRecord, IngestionRunRecord, PoisonPillRecord
+from warden_ingestion.models import DocumentRecord, PoisonPillRecord
 
 
 @pytest.mark.asyncio

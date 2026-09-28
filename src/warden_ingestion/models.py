@@ -1,8 +1,7 @@
 """Data models and entity records for warden-ingestion."""
 
-from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Any, Optional
+from dataclasses import dataclass
+from typing import Optional
 
 
 @dataclass

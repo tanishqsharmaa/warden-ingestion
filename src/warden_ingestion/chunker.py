@@ -1,7 +1,7 @@
 """Table-aware recursive text chunking preserving Markdown tables and semantic structure."""
 
 import re
-from typing import Optional
+
 from warden_ingestion.models import ChunkPayload
 
 
@@ -25,13 +25,14 @@ class TableAwareChunker:
         lines = [line.strip() for line in block.strip().split("\n") if line.strip()]
         if len(lines) < 2:
             return False
-        has_table_sep = any(re.match(r"^\|?[\s:-]+[-]+[\s:-]*(\|[\s:-]+[-]+[\s:-]*)+\|?$", line) for line in lines)
+        pattern = r"^\|?[\s:-]+[-]+[\s:-]*(\|[\s:-]+[-]+[\s:-]*)+\|?$"
+        has_table_sep = any(re.match(pattern, line) for line in lines)
         has_pipe_rows = all(line.startswith("|") or "|" in line for line in lines)
         return has_table_sep and has_pipe_rows
 
     def _split_table(self, table_text: str) -> list[str]:
         """Split oversized table cleanly along row boundaries, repeating header."""
-        lines = [l for l in table_text.strip().split("\n") if l.strip()]
+        lines = [line for line in table_text.strip().split("\n") if line.strip()]
         if len(lines) <= 2:
             return [table_text]
 
@@ -93,8 +94,8 @@ class TableAwareChunker:
         if len(lines) > 1:
             chunks = []
             current = ""
-            for l in lines:
-                l_str = l.strip()
+            for line_item in lines:
+                l_str = line_item.strip()
                 if not l_str:
                     continue
                 if len(current) + len(l_str) + 1 <= self.chunk_size_chars:

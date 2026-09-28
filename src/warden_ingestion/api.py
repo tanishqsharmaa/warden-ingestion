@@ -6,11 +6,11 @@ from typing import Any, Optional
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from pydantic import BaseModel, Field
+from warden_shared.errors import register_error_handlers
 
 from warden_ingestion.config import settings
 from warden_ingestion.controller import IngestionController
 from warden_ingestion.ledger import IngestionLedger
-from warden_shared.errors import register_error_handlers
 
 
 class IngestRunRequest(BaseModel):
@@ -102,7 +102,8 @@ def create_app(
         if not run:
             raise HTTPException(status_code=404, detail=f"Ingestion run '{run_id}' not found.")
 
-        is_completed = run.processed_documents + run.skipped_documents + run.failed_documents >= run.total_documents
+        completed_docs = run.processed_documents + run.skipped_documents + run.failed_documents
+        is_completed = completed_docs >= run.total_documents
         status = "COMPLETED" if is_completed and run.total_documents > 0 else "PROCESSING"
 
         return {

@@ -1,5 +1,7 @@
 import asyncio
+
 import pytest
+
 from warden_ingestion.chunker import TableAwareChunker
 from warden_ingestion.models import ChunkPayload
 from warden_ingestion.queue import BoundedChunkQueue
@@ -17,7 +19,9 @@ def test_markdown_table_preserved_intact():
         "| 5+ Years | 25 Days | 10 Days |\n\n"
         "Employees must request leave 2 weeks in advance."
     )
-    chunks = chunker.split_text("DOC-001", markdown_with_table, ["Employee"], "file:///doc.md", True)
+    chunks = chunker.split_text(
+        "DOC-001", markdown_with_table, ["Employee"], "file:///doc.md", True
+    )
     assert len(chunks) >= 1
     # Check that the entire table structure is present in a chunk without mid-row cut
     table_chunk = next(c for c in chunks if "| Service Years |" in c.content)
@@ -32,7 +36,9 @@ def test_recursive_chunking_multi_page_text():
     paragraphs = [f"Paragraph {i}: " + ("word " * 50) for i in range(10)]
     long_text = "\n\n".join(paragraphs)
 
-    chunks = chunker.split_text("DOC-LONG", long_text, ["Employee", "Manager"], "file:///long.md", False)
+    chunks = chunker.split_text(
+        "DOC-LONG", long_text, ["Employee", "Manager"], "file:///long.md", False
+    )
     assert len(chunks) > 1
     for i, c in enumerate(chunks):
         assert c.chunk_index == i

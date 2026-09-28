@@ -1,7 +1,6 @@
 """Script to download, export, and prepare INT8 ONNX embedding models."""
 
 import argparse
-import os
 from pathlib import Path
 
 

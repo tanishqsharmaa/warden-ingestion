@@ -1,7 +1,7 @@
 """Bounded staging queue implementing high/low watermark backpressure."""
 
 import asyncio
-from typing import Optional
+
 from warden_ingestion.models import ChunkPayload
 
 

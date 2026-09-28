@@ -1,5 +1,6 @@
 import json
 from unittest.mock import AsyncMock, MagicMock
+
 import pytest
 
 from warden_ingestion.controller import IngestionController
@@ -58,7 +59,9 @@ async def test_controller_skips_duplicate_document():
         }
     ]
 
-    summary = await controller.process_manifest_documents("run-1", manifest_data, force_reindex=False)
+    summary = await controller.process_manifest_documents(
+        "run-1", manifest_data, force_reindex=False
+    )
     assert summary["skipped_documents"] == 1
     assert summary["processed_documents"] == 0
     assert summary["failed_documents"] == 0
@@ -118,7 +121,9 @@ async def test_controller_processes_valid_document():
         }
     ]
 
-    summary = await controller.process_manifest_documents("run-1", manifest_data, force_reindex=False)
+    summary = await controller.process_manifest_documents(
+        "run-1", manifest_data, force_reindex=False
+    )
     assert summary["processed_documents"] == 1
     assert summary["skipped_documents"] == 0
     assert summary["failed_documents"] == 0
@@ -156,7 +161,9 @@ async def test_controller_poison_pill_quarantine():
         }
     ]
 
-    summary = await controller.process_manifest_documents("run-1", manifest_data, force_reindex=False)
+    summary = await controller.process_manifest_documents(
+        "run-1", manifest_data, force_reindex=False
+    )
     assert summary["failed_documents"] == 1
     assert summary["processed_documents"] == 0
     mock_ledger.record_poison_pill.assert_called_once()

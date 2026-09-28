@@ -142,7 +142,13 @@ class PresidioScrubberPool:
         """Asynchronously scrub a batch of text strings across the worker pool."""
         loop = asyncio.get_running_loop()
         futures = [
-            loop.run_in_executor(self.executor, _worker_scrub, text, self.threshold, self.model_name)
+            loop.run_in_executor(
+                self.executor,
+                _worker_scrub,
+                text,
+                self.threshold,
+                self.model_name,
+            )
             for text in texts
         ]
         return await asyncio.gather(*futures)

@@ -1,5 +1,5 @@
-import pytest
 from warden_ingestion.config import Settings
+
 
 def test_settings_defaults(monkeypatch):
     monkeypatch.delenv("SQLITE_DB_PATH", raising=False)
