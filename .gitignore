@@ -1,19 +1,81 @@
-/.agents
-/Docs
-.venv/
-__pycache__/
-*.py[cod]
-*$py.class
-.pytest_cache/
-.ruff_cache/
-.mypy_cache/
-*.egg-info/
-dist/
-build/
-.superpowers/
-.agent/
+# ==============================================================================
+# Warden Platform: .gitignore (Non-Program Files, Documentation & Build Caches)
+# ==============================================================================
+
+# --- Documentation, Specs & Markdown (except repository README) ---
+Docs/
+docs/
+*.md
+!README.md
+AGENTS.md
+*.pdf
+*.docx
+*.rtf
+
+# --- Data, Storage & ML Model Weights ---
 data/
 *.db
 *.db-wal
 *.db-shm
 models/
+*.onnx
+
+# --- Build Artifacts & Virtual Environments ---
+Build/
+build/
+dist/
+*.egg-info/
+*.egg
+.venv/
+venv/
+env/
+ENV/
+
+# --- Node.js & Tooling Dependencies ---
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+
+# --- Agent & Harness Configuration & Workspaces ---
+.agents/
+.agent/
+.superpowers/
+opencode.json
+.opencode/
+
+# --- Python Bytecode & Runtime Caches ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# --- Testing & Quality Assurance Tool Caches ---
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+
+# --- Secrets, Credentials & Local Environments ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.cert
+
+# --- IDE, Editor & OS Scratch Files ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
