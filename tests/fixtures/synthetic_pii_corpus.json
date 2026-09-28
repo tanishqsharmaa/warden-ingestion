@@ -1,0 +1,48 @@
+[
+  {
+    "id": "CASE-01",
+    "raw": "Please contact John Doe at j.doe@example.com or call 555-123-4567. SSN: 000-12-3456.",
+    "expected_tokens": [
+      "<ANONYMIZED_PERSON>",
+      "<ANONYMIZED_EMAIL>",
+      "<ANONYMIZED_PHONE>",
+      "<ANONYMIZED_SSN>"
+    ],
+    "expected_entities": [
+      "PERSON",
+      "EMAIL_ADDRESS",
+      "PHONE_NUMBER",
+      "US_SSN"
+    ]
+  },
+  {
+    "id": "CASE-02",
+    "raw": "HR Lead Alice Johnson (alice.johnson@company.org) approved the parental leave policy. Inquiries can be sent to hr-support@company.org.",
+    "expected_tokens": [
+      "<ANONYMIZED_PERSON>",
+      "<ANONYMIZED_EMAIL>"
+    ],
+    "expected_entities": [
+      "PERSON",
+      "EMAIL_ADDRESS"
+    ]
+  },
+  {
+    "id": "CASE-03",
+    "raw": "Employee Bob Smith can be reached at emergency contact 555-987-6543.",
+    "expected_tokens": [
+      "<ANONYMIZED_PERSON>",
+      "<ANONYMIZED_PHONE>"
+    ],
+    "expected_entities": [
+      "PERSON",
+      "PHONE_NUMBER"
+    ]
+  },
+  {
+    "id": "CASE-04",
+    "raw": "All full-time employees are eligible for 18 days of paid time off per calendar year. No personal identification required.",
+    "expected_tokens": [],
+    "expected_entities": []
+  }
+]
