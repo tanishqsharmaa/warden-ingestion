@@ -142,7 +142,7 @@ class IngestionController:
                         time.sleep(0.05 * (2**attempt))
 
             if not success:
-                # Quarantined to poison_pills DLQ table
+                # Quarantined to poison_pills DLQ table and ledger
                 failed_count += 1
                 pill = PoisonPillRecord(
                     id=str(uuid.uuid4()),
@@ -154,11 +154,21 @@ class IngestionController:
                     stack_trace=last_trace,
                 )
                 await self.ledger.record_poison_pill(pill)
-                await self.ledger.update_document_status(
-                    doc_id=doc_id,
+
+                failed_doc = DocumentRecord(
+                    id=doc_id,
+                    source_url=source_url,
+                    content_hash=content_hash,
+                    title=title,
+                    role_tags=role_tags,
+                    raw_character_count=len(content),
+                    scrubbed_character_count=0,
+                    redaction_hits_json="{}",
+                    chunk_count=0,
                     status="POISON_PILL",
                     error_message=f"Failed at {last_stage} after 3 retries",
                 )
+                await self.ledger.record_document(failed_doc)
 
         # Broadcast cache invalidation if any document was successfully indexed
         if affected_roles:
