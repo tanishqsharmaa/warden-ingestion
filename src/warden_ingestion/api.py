@@ -1,8 +1,9 @@
 """FastAPI REST application, health probes, and batch ingestion triggers."""
 
 import uuid
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any, AsyncIterator, Optional
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from pydantic import BaseModel, Field
@@ -33,18 +34,34 @@ def create_app(
     ledger: Optional[IngestionLedger] = None,
     controller: Optional[IngestionController] = None,
 ) -> FastAPI:
-    """FastAPI application factory."""
+    """FastAPI application factory with lifecycle management."""
+    _ledger = ledger or IngestionLedger(db_path=settings.SQLITE_DB_PATH)
+    _controller = controller
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        # Startup: initialize database tables and WAL pragmas
+        if hasattr(_ledger, "initialize"):
+            await _ledger.initialize()
+        yield
+        # Shutdown: release network connections and worker pools
+        if _controller:
+            if hasattr(_controller.grpc_client, "close"):
+                await _controller.grpc_client.close()
+            if hasattr(_controller.publisher, "close"):
+                await _controller.publisher.close()
+            if hasattr(_controller.scrubber, "shutdown"):
+                _controller.scrubber.shutdown()
+
     app = FastAPI(
         title="Warden Ingestion Service",
         version="1.0.0",
         description="Batch document ingestion and PII sanitization microservice (Tier 2)",
+        lifespan=lifespan,
     )
 
     # Register standardized RFC 7807 problem details exception handlers
     register_error_handlers(app)
-
-    _ledger = ledger or IngestionLedger(db_path=settings.SQLITE_DB_PATH)
-    _controller = controller
 
     @app.get("/health")
     async def health_check() -> dict[str, Any]:
@@ -76,7 +93,7 @@ def create_app(
         request: IngestRunRequest,
         background_tasks: BackgroundTasks,
     ) -> IngestRunResponse:
-        """Trigger an asynchronous batch ingestion run."""
+        """Trigger an asynchronous batch ingestion run with coordinated run_id."""
         run_id = f"ingest-run-{uuid.uuid4()}"
         started_at = datetime.now(timezone.utc).isoformat()
 
@@ -85,6 +102,10 @@ def create_app(
                 _controller.run_manifest,
                 manifest_url=request.manifest_url,
                 force_reindex=request.force_reindex,
+                run_id=run_id,
+                chunk_size_tokens=request.chunk_size_tokens,
+                chunk_overlap_tokens=request.chunk_overlap_tokens,
+                default_roles=request.target_roles_default,
             )
 
         return IngestRunResponse(

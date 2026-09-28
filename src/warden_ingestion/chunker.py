@@ -6,7 +6,7 @@ from warden_ingestion.models import ChunkPayload
 
 
 class TableAwareChunker:
-    """Recursive chunker that preserves Markdown table rows and structure."""
+    """Recursive chunker that preserves Markdown table rows and structure with sliding overlap."""
 
     def __init__(
         self,
@@ -61,12 +61,19 @@ class TableAwareChunker:
 
         return chunks if chunks else [table_text]
 
+    def _get_overlap_seed(self, text: str) -> str:
+        """Extract a clean tail snippet to seed the next chunk for sliding overlap."""
+        if not self.overlap_chars or len(text) <= self.overlap_chars:
+            return ""
+        tail = text[-self.overlap_chars :]
+        idx = tail.find(" ")
+        return tail[idx + 1 :] if idx != -1 else tail
+
     def _split_text_block(self, text: str) -> list[str]:
-        """Recursively split regular prose on paragraphs, lines, and sentences."""
+        """Recursively split regular prose on paragraphs, lines, and words with overlap."""
         if len(text) <= self.chunk_size_chars:
             return [text.strip()] if text.strip() else []
 
-        # Split on paragraph boundaries
         paragraphs = text.split("\n\n")
         if len(paragraphs) > 1:
             chunks: list[str] = []
@@ -80,16 +87,16 @@ class TableAwareChunker:
                 else:
                     if current:
                         chunks.append(current.strip())
+                        current = self._get_overlap_seed(current)
                     if len(p_str) > self.chunk_size_chars:
                         chunks.extend(self._split_text_block(p_str))
                         current = ""
                     else:
-                        current = p_str
+                        current = f"{current}\n\n{p_str}" if current else p_str
             if current:
                 chunks.append(current.strip())
             return chunks
 
-        # Split on line boundaries
         lines = text.split("\n")
         if len(lines) > 1:
             chunks = []
@@ -103,12 +110,12 @@ class TableAwareChunker:
                 else:
                     if current:
                         chunks.append(current.strip())
-                    current = l_str
+                        current = self._get_overlap_seed(current)
+                    current = f"{current}\n{l_str}" if current else l_str
             if current:
                 chunks.append(current.strip())
             return chunks
 
-        # Fallback to word splitting
         words = text.split(" ")
         chunks = []
         current = ""
@@ -118,7 +125,8 @@ class TableAwareChunker:
             else:
                 if current:
                     chunks.append(current.strip())
-                current = w
+                    current = self._get_overlap_seed(current)
+                current = f"{current} {w}" if current else w
         if current:
             chunks.append(current.strip())
         return chunks
@@ -135,7 +143,6 @@ class TableAwareChunker:
         if not text.strip():
             return []
 
-        # Separate blocks into tables vs prose
         raw_blocks = text.split("\n\n")
         processed_sections: list[str] = []
 
@@ -151,7 +158,6 @@ class TableAwareChunker:
             else:
                 processed_sections.extend(self._split_text_block(b))
 
-        # Build chunks with overlap
         chunks: list[ChunkPayload] = []
         for idx, sec in enumerate(processed_sections):
             estimated_tokens = max(1, len(sec) // self.chars_per_token)

@@ -20,12 +20,14 @@ ledger = IngestionLedger(db_path=settings.SQLITE_DB_PATH)
 scrubber = PresidioScrubberPool(
     workers=settings.PRESIDIO_PROCESS_WORKERS,
     threshold=settings.PRESIDIO_CONFIDENCE_THRESHOLD,
+    model_name=settings.SPACY_MODEL_NAME,
 )
 chunker = TableAwareChunker(
     chunk_size_tokens=settings.CHUNK_SIZE_TOKENS,
     chunk_overlap_tokens=settings.CHUNK_OVERLAP_TOKENS,
 )
 embedder = OnnxEmbedder(
+    model_path=settings.ONNX_MODEL_PATH,
     batch_size=settings.EMBEDDING_BATCH_SIZE,
 )
 grpc_client = RetrievalGrpcClient(

@@ -2,14 +2,17 @@
 chunking, embedding, and hand-off.
 """
 
+import asyncio
 import hashlib
 import json
 import logging
 import time
 import traceback
+import urllib.request
 import uuid
 from pathlib import Path
 from typing import Any, Optional
+from urllib.parse import urlparse
 
 import httpx
 
@@ -51,8 +54,13 @@ class IngestionController:
         run_id: str,
         documents: list[dict[str, Any]],
         force_reindex: bool = False,
+        chunker_override: Optional[TableAwareChunker] = None,
+        default_roles: Optional[list[str]] = None,
     ) -> dict[str, Any]:
-        """Process list of document dictionaries through the complete pipeline."""
+        """Process list of document dictionaries through the complete pipeline with backpressure."""
+        active_chunker = chunker_override or self.chunker
+        fallback_roles = default_roles or ["Employee"]
+
         processed_count = 0
         skipped_count = 0
         failed_count = 0
@@ -65,7 +73,7 @@ class IngestionController:
             title = doc_item.get("title", "Untitled Document")
             content = doc_item.get("content", "")
             source_url = doc_item.get("source_url", "")
-            role_tags = doc_item.get("role_tags") or ["Employee"]
+            role_tags = doc_item.get("role_tags") or fallback_roles
 
             content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
 
@@ -84,15 +92,28 @@ class IngestionController:
 
             for attempt in range(1, 4):
                 try:
-                    # Stage 1: PII Scrubbing
+                    # Stage 1: PII Scrubbing (supports async scrub_batch or scrub_text)
                     last_stage = "PRESIDIO_SCRUB"
-                    scrub_res = self.scrubber.scrub_text(content)
+                    scrub_res = None
+                    if hasattr(self.scrubber, "scrub_batch"):
+                        try:
+                            res = self.scrubber.scrub_batch([content])
+                            if asyncio.iscoroutine(res):
+                                batch_res = await res
+                                if batch_res:
+                                    scrub_res = batch_res[0]
+                        except TypeError:
+                            pass
+
+                    if scrub_res is None:
+                        scrub_res = self.scrubber.scrub_text(content)
+
                     for k, v in scrub_res.redaction_counts.items():
                         pii_hits[k] = pii_hits.get(k, 0) + v
 
-                    # Stage 2: Chunking
+                    # Stage 2: Chunking with table awareness & overlap
                     last_stage = "CHUNKING"
-                    chunks = self.chunker.split_text(
+                    chunks = active_chunker.split_text(
                         doc_id=doc_id,
                         text=scrub_res.text,
                         role_tags=role_tags,
@@ -100,16 +121,22 @@ class IngestionController:
                         redacted=bool(scrub_res.redaction_counts),
                     )
 
-                    # Stage 3: Embedding
-                    last_stage = "EMBEDDING"
-                    points = self.embedder.embed_chunks(chunks)
+                    # Stage 3: Backpressure Staging Queue Buffer
+                    last_stage = "QUEUE_STAGING"
+                    for chunk in chunks:
+                        await self.queue.push(chunk)
 
-                    # Stage 4: gRPC Indexing Hand-off
+                    # Stage 4: Draining & Batched INT8 ONNX Vectorization
+                    last_stage = "EMBEDDING"
+                    staged_chunks = await self.queue.pop_batch(max_batch=64)
+                    points = self.embedder.embed_chunks(staged_chunks)
+
+                    # Stage 5: gRPC Indexing Hand-off
                     last_stage = "INDEXING"
                     if points:
                         await self.grpc_client.index_batch(points, wait=False)
 
-                    # Stage 5: Ledger status commit
+                    # Stage 6: Ledger status commit
                     doc_record = DocumentRecord(
                         id=doc_id,
                         source_url=source_url,
@@ -140,7 +167,7 @@ class IngestionController:
                         e,
                     )
                     if attempt < 3:
-                        time.sleep(0.05 * (2**attempt))
+                        await asyncio.sleep(0.05 * (2**attempt))
 
             if not success:
                 # Quarantined to poison_pills DLQ table and ledger
@@ -189,35 +216,71 @@ class IngestionController:
         self,
         manifest_url: str,
         force_reindex: bool = False,
+        run_id: Optional[str] = None,
+        chunk_size_tokens: Optional[int] = None,
+        chunk_overlap_tokens: Optional[int] = None,
+        default_roles: Optional[list[str]] = None,
     ) -> dict[str, Any]:
         """Load manifest from file or URL and execute batch ingestion pipeline."""
         start_time = time.time()
-        run_id = f"ingest-run-{uuid.uuid4()}"
+        active_run_id = run_id or f"ingest-run-{uuid.uuid4()}"
 
-        # Parse manifest payload
+        chunker_override = None
+        if chunk_size_tokens is not None or chunk_overlap_tokens is not None:
+            c_size = chunk_size_tokens or self.chunker.chunk_size_tokens
+            c_overlap = chunk_overlap_tokens or self.chunker.chunk_overlap_tokens
+            chunker_override = TableAwareChunker(
+                chunk_size_tokens=c_size,
+                chunk_overlap_tokens=c_overlap,
+            )
+
+        # Parse manifest payload with safe path/URI resolution
         documents: list[dict[str, Any]] = []
-        if manifest_url.startswith("file://") or Path(manifest_url).exists():
-            file_path = manifest_url.replace("file://", "")
-            if not Path(file_path).exists() and manifest_url.startswith("file:///"):
-                # Handle Windows file:/// path
-                file_path = manifest_url[8:] if manifest_url[9:11] == ":/" else manifest_url[7:]
-            raw_text = Path(file_path).read_text(encoding="utf-8")
-            documents = json.loads(raw_text)
-        elif manifest_url.startswith("http://") or manifest_url.startswith("https://"):
-            async with httpx.AsyncClient() as client:
-                resp = await client.get(manifest_url, timeout=30.0)
-                resp.raise_for_status()
-                documents = resp.json()
-        else:
-            raw_text = Path(manifest_url).read_text(encoding="utf-8")
-            documents = json.loads(raw_text)
+        try:
+            parsed = urlparse(manifest_url)
+            if parsed.scheme in ("http", "https"):
+                async with httpx.AsyncClient() as client:
+                    resp = await client.get(manifest_url, timeout=30.0)
+                    resp.raise_for_status()
+                    documents = resp.json()
+            elif parsed.scheme == "file":
+                local_path = urllib.request.url2pathname(parsed.path)
+                # Normalize Windows drive letters if leading slash remains
+                if len(local_path) > 2 and local_path[0] == "\\" and local_path[2] == ":":
+                    local_path = local_path[1:]
+                raw_text = Path(local_path).read_text(encoding="utf-8")
+                documents = json.loads(raw_text)
+            else:
+                raw_text = Path(manifest_url).read_text(encoding="utf-8")
+                documents = json.loads(raw_text)
+        except Exception as e:
+            logger.error("Failed to load manifest %s: %s", manifest_url, e)
+            await self.ledger.record_run_start(active_run_id, manifest_url, 0)
+            await self.ledger.record_run_completion(
+                active_run_id,
+                processed=0,
+                skipped=0,
+                failed=1,
+                duration_seconds=round(time.time() - start_time, 2),
+            )
+            return {
+                "run_id": active_run_id,
+                "status": "FAILED",
+                "error": str(e),
+                "total_documents": 0,
+                "processed_documents": 0,
+                "skipped_documents": 0,
+                "failed_documents": 1,
+            }
 
-        await self.ledger.record_run_start(run_id, manifest_url, len(documents))
+        await self.ledger.record_run_start(active_run_id, manifest_url, len(documents))
 
         summary = await self.process_manifest_documents(
-            run_id=run_id,
+            run_id=active_run_id,
             documents=documents,
             force_reindex=force_reindex,
+            chunker_override=chunker_override,
+            default_roles=default_roles,
         )
 
         duration = time.time() - start_time
@@ -225,7 +288,7 @@ class IngestionController:
         summary["total_documents"] = len(documents)
 
         await self.ledger.record_run_completion(
-            run_id=run_id,
+            run_id=active_run_id,
             processed=summary["processed_documents"],
             skipped=summary["skipped_documents"],
             failed=summary["failed_documents"],

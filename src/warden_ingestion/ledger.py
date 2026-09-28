@@ -132,7 +132,11 @@ class IngestionLedger:
                     raw_character_count, scrubbed_character_count,
                     redaction_hits_json, chunk_count, status, error_message, updated_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-                ON CONFLICT(id) DO UPDATE SET
+                ON CONFLICT(content_hash) DO UPDATE SET
+                    id=excluded.id,
+                    source_url=excluded.source_url,
+                    title=excluded.title,
+                    role_tags=excluded.role_tags,
                     status=excluded.status,
                     chunk_count=excluded.chunk_count,
                     error_message=excluded.error_message,

@@ -83,8 +83,13 @@ class OnnxEmbedder:
 
             if self.tokenizer is not None:
                 encodings = self.tokenizer.encode_batch(texts)
-                input_ids = np.array([e.ids for e in encodings], dtype=np.int64)
-                attention_mask = np.array([e.attention_mask for e in encodings], dtype=np.int64)
+                max_len = max(len(e.ids) for e in encodings) if encodings else 16
+                padded_ids = [e.ids + [0] * (max_len - len(e.ids)) for e in encodings]
+                padded_masks = [
+                    e.attention_mask + [0] * (max_len - len(e.attention_mask)) for e in encodings
+                ]
+                input_ids = np.array(padded_ids, dtype=np.int64)
+                attention_mask = np.array(padded_masks, dtype=np.int64)
             else:
                 input_ids = np.ones((len(texts), 16), dtype=np.int64)
                 attention_mask = np.ones((len(texts), 16), dtype=np.int64)
